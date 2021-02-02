@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  namespace: custom-controller
+  name: max-fail-pod-controller
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: max-fail-pod-controller
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "watch", "list", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployment", "replicaset"]
+    verbs: ["get", "watch", "list", "update"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: max-fail-pod-controller
+subjects:
+  - kind: User
+    name: max-fail-pod-controller
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: max-fail-pod-controller
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: max-fail-pod-controller
+  namespace: custom-controller
+  labels:
+    app: max-fail-pod-controller
+    prometheus: kube-prometheus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: max-fail-pod-controller
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: max-fail-pod-controller
+        prometheus: kube-prometheus
+    spec:
+      serviceAccountName: max-fail-pod-controller
+      restartPolicy: Always
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: max-fail-pod-controller
+          image: "maxfailpod_controller:v0.1.0"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            readOnlyRootFilesystem: true
+          resources:
+            limits:
+              cpu: 400m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 64Mi
